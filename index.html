@@ -36,6 +36,9 @@
   .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;
     position:relative;overflow:hidden}
   .card.locked{border:1px solid var(--line)}
+  a.card.plan{display:block;text-decoration:none;color:inherit;
+    border:1px solid rgba(212,175,84,.22)}
+  a.card.plan .tag.bet{background:rgba(212,175,84,.16);color:#d6af54}
   .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .teams{font-weight:600;font-size:15px}
   .meta{color:var(--hint);font-size:12.5px;margin-top:3px}
@@ -155,7 +158,8 @@ function dayView(list) {
     ['Весь день · по подписке', line.filter(p => p.tier !== 'free')],
   ];
   return grp.filter(([, x]) => x.length)
-    .map(([t, x]) => `<div class="sect">${t} · ${x.length}</div>` + x.map(card).join('')).join('');
+    .map(([t, x]) => `<div class="sect">${t} · ${x.length}</div>` + x.map(card).join('')).join('')
+    + plansBlock();
 }
 
 function listView(list) {
@@ -190,7 +194,7 @@ function card(p) {
       </div>
       <div class="unlock">
         <span>Разбор и ставка — по подписке</span>
-        ${DATA?.tribute ? `<a href="${esc(DATA.tribute)}" target="_blank">Открыть</a>` : ''}
+        ${plansLink()}
       </div>
     </div>`;
 
@@ -211,6 +215,28 @@ function card(p) {
         ${p.risks ? `<div class="why"><b>Риски.</b> ${esc(p.risks)}</div>` : ''}
       </div>
     </div>`;
+}
+
+function plansLink() {
+  const p = DATA?.plans || [];
+  if (!p.length) return '';
+  // на карточке — самый дешёвый вход, весь список открывается по кнопке внизу
+  const cheapest = p.reduce((a, b) => (b.price < a.price ? b : a));
+  return `<a href="${esc(cheapest.url)}" target="_blank">от ${cheapest.price} ₽</a>`;
+}
+
+function plansBlock() {
+  const p = DATA?.plans || [];
+  if (!p.length || DATA?.subscribed) return '';
+  return `<div class="sect">Полный доступ</div>` + p.map(x => `
+    <a class="card plan" href="${esc(x.url)}" target="_blank">
+      <div class="row">
+        <div><div class="teams">${esc(x.title)}</div>
+          <div class="meta">${x.id === 'lifetime' ? 'разовый платёж, без срока' :
+            x.id === 'year' ? 'выгоднее месячного вчетверо' : 'доступ на 30 дней'}</div></div>
+        <span class="tag bet">${x.price} ₽</span>
+      </div>
+    </a>`).join('');
 }
 
 function marketsTable(raw) {
