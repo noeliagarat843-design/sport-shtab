@@ -96,7 +96,7 @@
 <nav>
   <button class="on" data-tab="day">День</button>
   <button data-tab="bets">Ставки</button>
-  <button data-tab="live">Лайв</button>
+  <button data-tab="pass">Пасы</button>
   <button data-tab="stats">Дистанция</button>
 </nav>
 
@@ -144,18 +144,16 @@ function render() {
   const all = DATA?.picks || [];
   if (TAB === 'day')    m.innerHTML = dayView(all);
   if (TAB === 'bets')   m.innerHTML = listView(all.filter(p => p.market || p.locked));
-  if (TAB === 'live')   m.innerHTML = listView(all.filter(p => p.kind === 'live'));
+  // «пас» — тоже результат разбора, поэтому у него своя вкладка, а не свалка в общем списке
+  if (TAB === 'pass')   m.innerHTML = listView(all.filter(p => !p.market && !p.locked));
   if (TAB === 'stats')  { loadStats().then(() => { if (TAB === 'stats') m.innerHTML = statsView(); }); }
 }
 
 function dayView(list) {
   if (!list.length) return `<div class="empty">Разборов на сегодня ещё нет.<br>Штаб собирает день.</div>`;
-  const line = list.filter(p => p.kind !== 'live');
-  const live = list.filter(p => p.kind === 'live');
   const grp = [
-    ['Лайв', live],
-    ['Открыто всем', line.filter(p => p.tier === 'free')],
-    ['Весь день · по подписке', line.filter(p => p.tier !== 'free')],
+    ['Открыто всем', list.filter(p => p.tier === 'free')],
+    ['Весь день · по подписке', list.filter(p => p.tier !== 'free')],
   ];
   return grp.filter(([, x]) => x.length)
     .map(([t, x]) => `<div class="sect">${t} · ${x.length}</div>` + x.map(card).join('')).join('')
@@ -168,7 +166,7 @@ function listView(list) {
 }
 
 function card(p) {
-  const icon = p.kind === 'live' ? '🔴' : (ICON[p.sport] || '⚽️');
+  const icon = ICON[p.sport] || '⚽️';
   const res = p.result === 'win' ? '<span class="tag win">зашла</span>'
             : p.result === 'lose' ? '<span class="tag lose">не зашла</span>'
             : p.locked ? '<span class="tag lock">🔒 подписка</span>'
