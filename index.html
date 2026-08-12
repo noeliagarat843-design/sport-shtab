@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Спорт-штаб</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg: var(--tg-theme-bg-color, #17212b);
+    --card: var(--tg-theme-secondary-bg-color, #232e3c);
+    --text: var(--tg-theme-text-color, #f5f5f5);
+    --hint: var(--tg-theme-hint-color, #8b98a5);
+    --link: var(--tg-theme-link-color, #62bcf9);
+    --btn: var(--tg-theme-button-color, #3390ec);
+    --btn-text: var(--tg-theme-button-text-color, #fff);
+    --green:#4dd07a; --red:#ff6b6b; --amber:#ffc93c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding-bottom:24px}
+  header{padding:16px 16px 8px}
+  h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.02em}
+  .sub{color:var(--hint);font-size:13px;margin-top:2px}
+  nav{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:0 0 auto;background:var(--card);color:var(--hint);border:0;
+    padding:8px 14px;border-radius:18px;font-size:14px;font-weight:500;cursor:pointer}
+  nav button.on{background:var(--btn);color:var(--btn-text)}
+  main{padding:0 16px}
+  .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .teams{font-weight:600;font-size:15px}
+  .meta{color:var(--hint);font-size:12.5px;margin-top:3px}
+  .tag{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 8px;
+    border-radius:8px;background:rgba(255,255,255,.08);color:var(--hint);white-space:nowrap}
+  .tag.bet{background:rgba(77,208,122,.16);color:var(--green)}
+  .tag.pass{background:rgba(255,255,255,.08);color:var(--hint)}
+  .tag.live{background:rgba(255,107,107,.16);color:var(--red)}
+  .verdict{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}
+  .pick{font-weight:650;font-size:15px}
+  .nums{display:flex;gap:14px;margin-top:6px;font-size:13px;color:var(--hint);flex-wrap:wrap}
+  .nums b{color:var(--text);font-weight:600}
+  .why{margin-top:8px;font-size:13.5px;color:var(--hint)}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  th{text-align:left;color:var(--hint);font-weight:500;padding:5px 0;font-size:12px}
+  td{padding:5px 0;border-top:1px solid rgba(255,255,255,.06)}
+  td:last-child,th:last-child{text-align:right}
+  .val-pos{color:var(--green);font-weight:600}
+  .val-neg{color:var(--hint)}
+  .stat{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat .card{margin:0;text-align:center;padding:16px 10px}
+  .stat .big{font-size:24px;font-weight:650;letter-spacing:-.02em}
+  .stat .lbl{color:var(--hint);font-size:12px;margin-top:2px}
+  .empty{color:var(--hint);text-align:center;padding:40px 20px;font-size:14px}
+  .go{position:sticky;bottom:12px;margin:16px;padding:14px;border-radius:14px;border:0;
+    width:calc(100% - 32px);background:var(--btn);color:var(--btn-text);
+    font-size:16px;font-weight:600;cursor:pointer}
+  .upd{text-align:center;color:var(--hint);font-size:12px;padding:8px 0 2px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Спорт-штаб</h1>
+  <div class="sub" id="sub">загрузка…</div>
+</header>
+
+<nav>
+  <button class="on" data-tab="picks">Ставки дня</button>
+  <button data-tab="matches">Матчи</button>
+  <button data-tab="active">В игре</button>
+  <button data-tab="stats">Дистанция</button>
+</nav>
+
+<main id="main"><div class="empty">Загрузка данных…</div></main>
+
+<button class="go" id="go">Го — запустить разбор дня</button>
+<div class="upd" id="upd"></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+let DATA = null, TAB = 'picks';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load() {
+  try {
+    const r = await fetch('data.json?_=' + Date.now());
+    DATA = await r.json();
+  } catch (e) {
+    DATA = { generated: null, picks: [], matches: [], active: [], stats: null };
+  }
+  $('sub').textContent = DATA.generated
+    ? 'обновлено ' + DATA.generated
+    : 'данных пока нет';
+  $('upd').textContent = DATA.generated ? 'данные от ' + DATA.generated : '';
+  render();
+}
+
+function render() {
+  const m = $('main');
+  const d = DATA || {};
+  if (TAB === 'picks')   m.innerHTML = picks(d.picks || []);
+  if (TAB === 'matches') m.innerHTML = matches(d.matches || []);
+  if (TAB === 'active')  m.innerHTML = active(d.active || []);
+  if (TAB === 'stats')   m.innerHTML = stats(d.stats);
+}
+
+function picks(list) {
+  if (!list.length) return `<div class="empty">Ставок на сегодня нет.<br>Пас — тоже результат разбора.</div>`;
+  return list.map(p => `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="teams">${esc(p.match)}</div>
+          <div class="meta">${esc(p.league)} · ${esc(p.time)}</div>
+        </div>
+        <span class="tag ${p.verdict === 'ПАС' ? 'pass' : 'bet'}">${esc(p.verdict || 'СТАВКА')}</span>
+      </div>
+      <div class="verdict">
+        <div class="pick">${esc(p.market)}</div>
+        <div class="nums">
+          <span>кэф <b>${esc(p.odds)}</b></span>
+          <span>вер. <b>${esc(p.prob)}</b></span>
+          <span>вэлью <b class="${parseFloat(p.value) >= 1.05 ? 'val-pos' : 'val-neg'}">${esc(p.value)}</b></span>
+        </div>
+        ${p.why ? `<div class="why">${esc(p.why)}</div>` : ''}
+        ${p.table?.length ? tableHtml(p.table) : ''}
+      </div>
+    </div>`).join('');
+}
+
+function tableHtml(rows) {
+  return `<table><tr><th>Рынок</th><th>Кэф</th><th>Вэлью</th></tr>` +
+    rows.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td>
+      <td class="${parseFloat(r[2]) >= 1.05 ? 'val-pos' : 'val-neg'}">${esc(r[2])}</td></tr>`).join('') +
+    `</table>`;
+}
+
+function matches(list) {
+  if (!list.length) return `<div class="empty">Список матчей пуст.<br>Нажми «Го» — соберу день.</div>`;
+  return list.map(x => `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="teams">${esc(x.match)}</div>
+          <div class="meta">${esc(x.league)}${x.note ? ' · ' + esc(x.note) : ''}</div>
+        </div>
+        <span class="tag ${x.live ? 'live' : ''}">${esc(x.live || x.time)}</span>
+      </div>
+    </div>`).join('');
+}
+
+function active(list) {
+  if (!list.length) return `<div class="empty">Активных ставок нет.</div>`;
+  return list.map(b => `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="teams">${esc(b.market)}</div>
+          <div class="meta">${esc(b.match)} · ${esc(b.time)}</div>
+        </div>
+        <span class="tag ${b.state === 'живо' ? 'bet' : b.state === 'проиграно' ? 'live' : 'pass'}">${esc(b.state)}</span>
+      </div>
+      <div class="nums"><span>кэф <b>${esc(b.odds)}</b></span><span>сумма <b>${esc(b.stake)}</b></span></div>
+      ${b.note ? `<div class="why">${esc(b.note)}</div>` : ''}
+    </div>`).join('');
+}
+
+function stats(s) {
+  if (!s) return `<div class="empty">Статистики пока нет.<br>Нужно минимум 30 ставок для выводов.</div>`;
+  return `
+    <div class="stat">
+      <div class="card"><div class="big">${esc(s.bets)}</div><div class="lbl">ставок</div></div>
+      <div class="card"><div class="big ${parseFloat(s.roi) >= 0 ? 'val-pos' : 'val-neg'}">${esc(s.roi)}</div><div class="lbl">ROI</div></div>
+      <div class="card"><div class="big">${esc(s.hit)}</div><div class="lbl">проходимость</div></div>
+      <div class="card"><div class="big">${esc(s.avg_odds)}</div><div class="lbl">средний кэф</div></div>
+    </div>
+    ${s.calibration ? `<div class="card" style="margin-top:10px">
+      <div class="lbl" style="text-align:left">Калибровка</div>
+      <div class="why">${esc(s.calibration)}</div></div>` : ''}
+    ${s.note ? `<div class="card"><div class="why">${esc(s.note)}</div></div>` : ''}`;
+}
+
+document.querySelectorAll('nav button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    TAB = b.dataset.tab;
+    render();
+  };
+});
+
+$('go').onclick = () => {
+  if (tg?.sendData) { tg.sendData(JSON.stringify({ cmd: 'go' })); tg.close(); }
+  else alert('Команда «Го» отправляется из Telegram.');
+};
+
+load();
+</script>
+</body>
+</html>
